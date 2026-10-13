@@ -22,9 +22,7 @@ function decodeJwtPayload<T = Record<string, unknown>>(token: string): T | null 
   }
 }
 
-/**
- * Server Action: Sign in user and set secure HTTP-only session cookies
- */
+ 
 export async function signInAction(payload: LoginPayload): Promise<ApiResponse<AuthResponseData>> {
   const result = await authService.signIn(payload)
 
@@ -65,17 +63,13 @@ export async function signInAction(payload: LoginPayload): Promise<ApiResponse<A
   return result
 }
 
-/**
- * Server Action: Register new user
- */
+
 export async function signUpAction(payload: SignUpPayload): Promise<ApiResponse<AuthResponseData>> {
   // from here should just show the ui error before send response in server action
   return await authService.signUp(payload)
 }
 
-/**
- * Server Action: Retrieve current user from cookie session with JWT fallback
- */
+
 export async function getUserAction(): Promise<User | null> {
   const cookieStore = await cookies()
   const token =
@@ -111,9 +105,7 @@ export async function getUserAction(): Promise<User | null> {
   return null
 }
 
-/**
- * Server Action: Destroy session and clear all authentication cookies
- */
+
 export async function logoutAction(): Promise<ApiResponse> {
   const cookieStore = await cookies()
   const token = cookieStore.get("accessToken")?.value
@@ -129,23 +121,16 @@ export async function logoutAction(): Promise<ApiResponse> {
   return response
 }
 
-/**
- * Server Action: Email verification
- */
+
 export async function verifyEmailAction(payload: { email: string; otp: string }): Promise<ApiResponse> {
   return await authService.verifyEmail(payload)
 }
 
-/**
- * Server Action: Forgot password
- */
 export async function forgotPasswordAction(payload: { email: string }): Promise<ApiResponse> {
   return await authService.forgotPassword(payload)
 }
 
-/**
- * Server Action: Reset password
- */
+
 export async function resetPasswordAction(payload: {
   email: string
   otp: string
@@ -153,10 +138,7 @@ export async function resetPasswordAction(payload: {
 }): Promise<ApiResponse> {
   return await authService.resetPassword(payload)
 }
-
-/**
- * Server Action: Change password (requires active session token)
- */
+ 
 export async function changePasswordAction(payload: {
   currentPassword: string
   newPassword: string
@@ -166,3 +148,4 @@ export async function changePasswordAction(payload: {
 
   return await authService.changePassword(payload, token)
 }
+

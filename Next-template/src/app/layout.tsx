@@ -1,9 +1,10 @@
-import { Geist, Geist_Mono, Inter, Roboto } from "next/font/google"
+import { Geist_Mono, Inter, Roboto } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/src/components/theme-provider"
-import { AuthProvider } from "@/src/context/auth-context"
 import { cn } from "@/src/lib/utils"
+import { AppNavbar } from "../components/shared/app-navbar";
+import { AppFooter } from "../components/shared/app-footer";
 
 const robotoHeading = Roboto({subsets:['latin'],variable:'--font-heading'});
 
@@ -25,9 +26,12 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, robotoHeading.variable)}
     >
-      <body>
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+      <body suppressHydrationWarning>
+        <ThemeProvider >
+        
+          {children}
+             {/* <Toaster /> */}
+   
         </ThemeProvider>
       </body>
     </html>

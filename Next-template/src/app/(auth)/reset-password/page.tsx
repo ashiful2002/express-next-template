@@ -3,8 +3,7 @@
 import React, { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/src/hooks/use-auth"
-import { Button } from "@/src/components/ui/button"
+ import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
 import { PasswordInput } from "@/src/components/forms/password-input"
@@ -20,12 +19,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card"
+import { resetPasswordAction } from "../../_action/auth.action"
 
 function ResetPasswordForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { resetPassword } = useAuth()
-
+ 
   const [email, setEmail] = useState(searchParams.get("email") || "")
   const [otp, setOtp] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -57,7 +56,7 @@ function ResetPasswordForm() {
     setIsSubmitting(true)
 
     try {
-      await resetPassword({ email, otp, newPassword })
+      await resetPasswordAction({ email, otp, newPassword })
       setSuccess("Password reset successfully! Redirecting to login...")
       setTimeout(() => {
         router.push(`/login?email=${encodeURIComponent(email)}`)

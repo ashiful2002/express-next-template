@@ -3,8 +3,7 @@
 import React, { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/src/hooks/use-auth"
-import { Button } from "@/src/components/ui/button"
+ import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
 import {
@@ -15,10 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card"
+import { forgotPasswordAction } from "../../_action/auth.action"
 
+ 
 export default function ForgotPasswordPage() {
   const router = useRouter()
-  const { forgotPassword } = useAuth()
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -29,7 +29,10 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(true)
 
     try {
-      await forgotPassword(email)
+      const res = await forgotPasswordAction({ email })
+      if (!res.success) {
+        throw new Error(res.message || "Failed to send reset code.")
+      }
       router.push(`/reset-password?email=${encodeURIComponent(email)}`)
     } catch (err: unknown) {
       if (err instanceof Error) {

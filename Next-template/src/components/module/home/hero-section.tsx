@@ -4,7 +4,6 @@ import { PageContainer } from "@/src/components/layout/page-container"
 import { AppButton } from "@/src/components/common/app-button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  SparklesIcon,
   ArrowRight01Icon,
   CheckmarkCircle01Icon,
 } from "@hugeicons/core-free-icons"

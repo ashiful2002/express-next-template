@@ -3,7 +3,6 @@
 import React, { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/src/hooks/use-auth"
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { PasswordInput } from "@/src/components/forms/password-input"
@@ -17,10 +16,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card"
+import { signUpAction } from "../../_action/auth.action"
+import { authService } from "@/src/services/auth.service"
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { signUp, getGoogleLoginUrl } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -45,7 +45,7 @@ export default function RegisterPage() {
     setIsSubmitting(true)
 
     try {
-      await signUp({ name, email, password })
+      await signUpAction({ name, email, password })
       router.push(`/verify-email?email=${encodeURIComponent(email)}`)
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -59,7 +59,7 @@ export default function RegisterPage() {
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = getGoogleLoginUrl("/dashboard")
+    window.location.href = authService.getGoogleLoginUrl("/dashboard")
   }
 
   return (

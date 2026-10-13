@@ -3,7 +3,6 @@
 import React, { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/src/hooks/use-auth"
 import { Button } from "@/src/components/ui/button"
 import { Input } from "@/src/components/ui/input"
 import { Label } from "@/src/components/ui/label"
@@ -19,11 +18,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card"
+import { verifyEmailAction } from "../../_action/auth.action"
 
 function VerifyEmailForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { verifyEmail } = useAuth()
 
   const [email, setEmail] = useState(searchParams.get("email") || "")
   const [otp, setOtp] = useState("")
@@ -47,10 +46,13 @@ function VerifyEmailForm() {
     setIsSubmitting(true)
 
     try {
-      await verifyEmail(email, otp)
+      const res = await verifyEmailAction({ email, otp })
+      if (!res.success) {
+        throw new Error(res.message || "Verification failed.")
+      }
       setSuccess("Email verified successfully! Redirecting...")
       setTimeout(() => {
-        router.push(`/login?email=${encodeURIComponent(email)}`)
+        router.push(`/sign-in?email=${encodeURIComponent(email)}`)
       }, 1500)
     } catch (err: unknown) {
       if (err instanceof Error) {
