@@ -274,17 +274,46 @@ const verifyEmail = async (email: string, otp: string) => {
             otp,
         },
     });
-    
-    if (result.status && !result.user.emailVerified) {
-        await prisma.user.update({
-            where: {
-                email,
-            },
-            data: {
-                emailVerified: true,
-            },
-        });
+
+    if (!result?.status) {
+        throw new AppError(status.BAD_REQUEST, "Email verification failed");
     }
+
+    const updatedUser = await prisma.user.update({
+        where: {
+            email,
+        },
+        data: {
+            emailVerified: true,
+        },
+    });
+
+    const accessToken = tokenUtils.getAccessToken({
+        userId: updatedUser.id,
+        role: updatedUser.role,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        status: updatedUser.status,
+        isDeleted: updatedUser.isDeleted,
+        emailVerified: updatedUser.emailVerified,
+    });
+
+    const refreshToken = tokenUtils.getRefreshToken({
+        userId: updatedUser.id,
+        role: updatedUser.role,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        status: updatedUser.status,
+        isDeleted: updatedUser.isDeleted,
+        emailVerified: updatedUser.emailVerified,
+    });
+
+    return {
+        user: updatedUser,
+        accessToken,
+        refreshToken,
+        token: (result as Record<string, unknown>)?.token as string | undefined,
+    };
 };
 
 const forgotPassword = async (email: string) => {

@@ -50,9 +50,9 @@ function VerifyEmailForm() {
       if (!res.success) {
         throw new Error(res.message || "Verification failed.")
       }
-      setSuccess("Email verified successfully! Redirecting...")
+      setSuccess("Email verified successfully! Redirecting to your profile...")
       setTimeout(() => {
-        router.push(`/sign-in?email=${encodeURIComponent(email)}`)
+        router.push("/dashboard/profile")
       }, 1500)
     } catch (err: unknown) {
       if (err instanceof Error) {

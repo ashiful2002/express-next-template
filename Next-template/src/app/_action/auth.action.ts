@@ -122,8 +122,44 @@ export async function logoutAction(): Promise<ApiResponse> {
 }
 
 
-export async function verifyEmailAction(payload: { email: string; otp: string }): Promise<ApiResponse> {
-  return await authService.verifyEmail(payload)
+export async function verifyEmailAction(payload: { email: string; otp: string }): Promise<ApiResponse<AuthResponseData>> {
+  const result = await authService.verifyEmail(payload)
+
+  if (result.success && result.data) {
+    const cookieStore = await cookies()
+    const accessToken = result.data.accessToken || result.data.token
+    const refreshToken = result.data.refreshToken
+    const isProduction = process.env.NODE_ENV === "production"
+
+    if (accessToken) {
+      cookieStore.set("accessToken", accessToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      })
+      cookieStore.set("token", accessToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+      })
+    }
+
+    if (refreshToken) {
+      cookieStore.set("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      })
+    }
+  }
+
+  return result
 }
 
 export async function forgotPasswordAction(payload: { email: string }): Promise<ApiResponse> {

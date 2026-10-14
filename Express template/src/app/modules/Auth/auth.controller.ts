@@ -163,9 +163,13 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
   const { email, otp } = req.body;
   const result = await AuthService.verifyEmail(email, otp);
 
-  // here to set the credentials to cookie
+  const { accessToken, refreshToken, token } = result;
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
+  if (token) {
+    tokenUtils.setBetterAuthSessionCookie(res, token);
+  }
 
-  
   sendResponse(res, {
     httpStatusCode: status.OK,
     success: true,

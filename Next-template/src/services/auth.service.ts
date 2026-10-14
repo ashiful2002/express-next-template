@@ -30,8 +30,8 @@ export const authService = {
     })
   },
 
-  verifyEmail: async (payload: { email: string; otp: string }): Promise<ApiResponse> => {
-    return fetcher("/auth/verify-email", {
+  verifyEmail: async (payload: { email: string; otp: string }): Promise<ApiResponse<AuthResponseData>> => {
+    return fetcher<AuthResponseData>("/auth/verify-email", {
       method: "POST",
       body: JSON.stringify(payload),
     })
