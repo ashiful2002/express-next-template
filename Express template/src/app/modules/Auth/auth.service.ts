@@ -274,6 +274,7 @@ const verifyEmail = async (email: string, otp: string) => {
             otp,
         },
     });
+    
     if (result.status && !result.user.emailVerified) {
         await prisma.user.update({
             where: {

@@ -19,12 +19,15 @@ A production-ready Next.js 16 (App Router) starter powered by React 19, Tailwind
 ## Getting Started
 
 ### 1. Configure Environment Variables
+
 Copy `.env.example` to `.env.local`:
+
 ```bash
 cp .env.example .env.local
 ```
 
 Default variables:
+
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5001/api/v1
 NEXT_PUBLIC_BACKEND_URL=http://localhost:5001
@@ -32,10 +35,12 @@ NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:5001
 ```
 
 ### 2. Install & Run
+
 ```bash
 pnpm install
 pnpm dev
 ```
+
 Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ---
@@ -46,8 +51,8 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 src/
 ├── app/
 │   ├── (auth)/
-│   │   ├── login/page.tsx      # Sign In page
-│   │   └── register/page.tsx   # Sign Up page
+│   │   ├── sign-in/page.tsx      # Sign In page
+│   │   └── sign-up/page.tsx   # Sign Up page
 │   ├── globals.css             # Tailwind v4 styles & theme tokens
 │   ├── layout.tsx              # RootLayout with ThemeProvider & AuthProvider
 │   └── page.tsx                # Home page with auth status preview
@@ -72,6 +77,7 @@ public/                         # Root static files (images, icons)
 ## Authentication Usage
 
 Inside any client component:
+
 ```tsx
 'use client';
 
@@ -97,7 +103,9 @@ export default function ProfileWidget() {
 ## Adding More Shadcn Components
 
 To add additional components:
+
 ```bash
 npx shadcn@latest add dialog
 ```
+
 Components will automatically install to `src/components/ui/` with `@/` aliases.

@@ -61,7 +61,7 @@ export function AppNavbar({
         className
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto flex h-16 items-center justify-between">
         {/* Brand / Logo */}
         <div className="flex items-center gap-8">
           <Link
@@ -145,7 +145,7 @@ export function AppNavbar({
                   Sign in
                 </AppButton>
               </Link>
-              <Link href="/register">
+              <Link href="/sign-up">
                 <AppButton variant="default" size="sm">
                   Get Started
                 </AppButton>

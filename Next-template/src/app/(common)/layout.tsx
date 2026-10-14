@@ -8,9 +8,9 @@ export default function CommonLayout({
 }>) {
   return (
     <>
-      {" "}
       <AppNavbar />
-      {children} <AppFooter />
+      <div className="container mx-auto">{children}</div>
+      <AppFooter />
     </>
   )
 }

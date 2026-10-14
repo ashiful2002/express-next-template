@@ -88,7 +88,7 @@ export function AuthStatusCard({
             <Link href="/login">
               <AppButton variant="default">Sign In to Account</AppButton>
             </Link>
-            <Link href="/register">
+            <Link href="/sign-up">
               <AppButton variant="outline">Create New Account</AppButton>
             </Link>
           </div>

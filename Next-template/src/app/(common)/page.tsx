@@ -19,21 +19,16 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
- 
       <main className="flex-1">
         <HeroSection isAuthenticated={isAuthenticated} />
-
         <PageContainer>
           <MetricsGrid isAuthenticated={isAuthenticated} role={user?.role} />
-
           <div className="mb-12 flex flex-col gap-5 md:flex-row" id="features">
             <FeaturesCard />
-
             <TechSpecsCard />
           </div>
         </PageContainer>
       </main>
-
 
       <ConfirmDialog
         open={logoutDialogOpen}

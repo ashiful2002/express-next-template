@@ -2,9 +2,11 @@ import { ApiResponse } from "@/src/types"
 import { formatErrorMessage } from "@/src/utils/error"
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "http://localhost:5001/api/v1"
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api/v1"
+
+if (!API_BASE_URL) {
+  throw new Error("backedn api mismatched")
+}
 
 export const normalizeUrl = (endpoint: string): string => {
   const base = API_BASE_URL.replace(/\/$/, "")
@@ -16,10 +18,6 @@ export interface FetcherOptions extends RequestInit {
   token?: string
 }
 
-/**
- * Global HTTP requester for all service files (auth.service, user.service, etc.).
- * Standardizes headers, JSON serialization, and friendly error normalization.
- */
 export async function fetcher<T = unknown>(
   endpoint: string,
   options: FetcherOptions = {}
@@ -67,4 +65,3 @@ export async function fetcher<T = unknown>(
     }
   }
 }
-

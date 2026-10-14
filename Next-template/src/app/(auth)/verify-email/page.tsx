@@ -67,7 +67,7 @@ function VerifyEmailForm() {
 
   return (
     <div className="w-full max-w-md space-y-4">
-      <BackButton href="/register" label="Back to register" />
+      <BackButton href="/sign-up" label="Back to register" />
 
       <Card className="w-full shadow-lg">
         <CardHeader className="space-y-1 text-center">
@@ -134,7 +134,7 @@ function VerifyEmailForm() {
         <CardFooter className="flex justify-center text-sm text-muted-foreground">
           Didn&apos;t receive a code?{" "}
           <Link
-            href="/register"
+            href="/sign-up"
             className="ml-1 font-medium text-primary hover:underline"
           >
             Try again
