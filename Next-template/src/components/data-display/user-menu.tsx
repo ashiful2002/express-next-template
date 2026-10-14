@@ -2,9 +2,16 @@
 
 import * as React from "react"
 import { UserAvatar } from "./user-avatar"
-import { AppDropdownMenu, type DropdownMenuItemConfig } from "@/src/components/overlays/app-dropdown-menu"
+import {
+  AppDropdownMenu,
+  type DropdownMenuItemConfig,
+} from "@/src/components/overlays/app-dropdown-menu"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Logout01Icon, UserIcon, Settings02Icon } from "@hugeicons/core-free-icons"
+import {
+  Logout01Icon,
+  UserIcon,
+  Settings02Icon,
+} from "@hugeicons/core-free-icons"
 
 export interface UserMenuProps {
   user: {
@@ -30,11 +37,11 @@ export function UserMenu({
     {
       id: "user-info",
       label: (
-        <div className="flex flex-col space-y-0.5 text-left py-1">
-          <p className="text-xs font-semibold text-foreground truncate max-w-[160px]">
+        <div className="flex flex-col space-y-0.5 py-1 text-left">
+          <p className="max-w-[160px] truncate text-xs font-semibold text-foreground">
             {user.name ?? "User"}
           </p>
-          <p className="text-[0.6875rem] text-muted-foreground truncate max-w-[160px]">
+          <p className="max-w-[160px] truncate text-[0.6875rem] text-muted-foreground">
             {user.email ?? ""}
           </p>
         </div>
@@ -93,4 +100,3 @@ export function UserMenu({
     />
   )
 }
-

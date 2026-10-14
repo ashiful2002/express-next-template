@@ -39,8 +39,6 @@ import {
   SidebarRail,
 } from "@/src/components/ui/sidebar"
 
-
-
 type NavItem = NavGroup["items"][number]
 
 type PermissionNavItem = NavItem & { permission?: string }
@@ -58,11 +56,8 @@ export type TerminologyMap = Partial<
   >
 >
 
-
 const can = (permissions: readonly string[] | undefined, needed?: string) =>
   !needed || !!permissions?.includes("*") || !!permissions?.includes(needed)
-
-
 
 export function buildSidebarGroups(
   labels: TerminologyMap = {}
@@ -260,25 +255,28 @@ export function buildSidebarGroups(
 
 export const sidebarGroups = buildSidebarGroups()
 
-
-
 export const adminSidebarGroups: NavGroup[] = [
   {
     label: "Platform",
     items: [
       {
         title: "Overview",
-        url: "/admin",
+        url: "/dashboard",
         icon: LayoutDashboard,
         isImplemented: true,
       },
       {
         title: "Organisations",
-        url: "/admin/organisations",
+        url: "/dashboard/organisations",
         icon: Building2,
         isImplemented: true,
       },
-      { title: "Users", url: "/admin/users", icon: Users, isImplemented: true },
+      {
+        title: "Users",
+        url: "/dashboard/users",
+        icon: Users,
+        isImplemented: true,
+      },
     ],
   },
   {
@@ -286,13 +284,13 @@ export const adminSidebarGroups: NavGroup[] = [
     items: [
       {
         title: "Plans",
-        url: "/admin/plans",
+        url: "/dashboard/plans",
         icon: Layers,
         isImplemented: true,
       },
       {
         title: "Subscriptions",
-        url: "/admin/subscriptions",
+        url: "/dashboard/subscriptions",
         icon: CreditCard,
         isImplemented: true,
       },
@@ -303,26 +301,25 @@ export const adminSidebarGroups: NavGroup[] = [
     items: [
       {
         title: "Support Access",
-        url: "/admin/support",
+        url: "/dashboard/support",
         icon: LifeBuoy,
         isImplemented: true,
       },
       {
         title: "Audit Logs",
-        url: "/admin/audit-logs",
+        url: "/dashboard/audit-logs",
         icon: ScrollText,
         isImplemented: true,
       },
-      {
-        title: "System Health",
-        url: "/admin/health",
-        icon: Activity,
-        isImplemented: false,
-      },
+      // {
+      //   title: "System Health",
+      //   url: "/dashboard/health",
+      //   icon: Activity,
+      //   isImplemented: false,
+      // },
     ],
   },
 ]
-
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -338,8 +335,8 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   } | null
 
   membership?: {
-    roleName?: string | null 
-    permissions?: string[] 
+    roleName?: string | null
+    permissions?: string[]
   } | null
 
   terminology?: TerminologyMap

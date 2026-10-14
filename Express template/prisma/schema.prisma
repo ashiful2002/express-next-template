@@ -7,4 +7,1708 @@ datasource db {
   provider = "postgresql"
 }
 
+// Stable internal key -> organisation-specific display label.
+// key examples: "student", "classGroup", "section", "subject", "assessment",
+// "academicYear", "fee", "guardian", "teacher", "studentStatus.ACTIVE"
+model TerminologyLabel {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  key            String
+  locale         String       @default("en") // ready for "bn"
+  singular       String
+  plural         String?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, key, locale])
+  @@map("terminology_labels")
+}
+
+model CustomFieldDefinition {
+  id             String            @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  entity         CustomFieldEntity
+  key            String
+  label          String
+  type           CustomFieldType
+  options        Json? // for SELECT
+  isRequired     Boolean           @default(false)
+  isActive       Boolean           @default(true)
+  sortOrder      Int               @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, entity, key])
+  @@map("custom_field_definitions")
+}
+
+// Seeded per organisation on creation (copies of the system roles) so each
+// tenant can edit its own role set without touching others.
+model Role {
+  id             String         @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name           String
+  description    String?
+  systemKey      SystemRoleKey?
+  isSystem       Boolean        @default(false) // system roles: name locked, OWNER never editable
+  permissions    String[] // "students.view", "fees.collect", "results.publish" ...
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  invitations Invitation[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, name])
+  @@unique([organisationId, systemKey])
+  @@map("roles")
+}
+
+model Membership {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  roleId         String
+  role           Role             @relation(fields: [roleId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  status         MembershipStatus @default(ACTIVE)
+  staffTitle     String? // e.g. "Ustadh", "Lead Instructor"
+  invitedById    String?
+  joinedAt       DateTime         @default(now())
+  removedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classSubjects       ClassSubject[]
+  sessionsTaught      ClassSession[]      @relation("SessionTeacher")
+  sessionsSubstituted ClassSession[]      @relation("SessionOriginalTeacher")
+  inAppNotifications  InAppNotification[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, userId])
+  @@index([userId, status])
+  @@index([organisationId, roleId])
+  @@map("organisation_memberships")
+}
+
+model Invitation {
+  id               String           @id @default(uuid(7))
+  organisationId   String
+  organisation     Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  email            String?
+  phone            String?
+  roleId           String
+  role             Role             @relation(fields: [roleId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  tokenHash        String // store a hash, never the raw token
+  status           InvitationStatus @default(PENDING)
+  expiresAt        DateTime
+  invitedById      String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([tokenHash])
+  @@index([organisationId, status])
+  @@index([email])
+  @@map("invitations")
+}
+
+// Append-only. No FK to organisation/user so logs outlive purges.
+model AuditLog {
+  id               String   @id @default(uuid(7))
+  organisationId   String?
+  actorUserId      String?
+  isPlatformAction Boolean  @default(false)
+  supportAccessId  String?
+  action           String // "marks.override", "payment.reverse", "share_link.create"
+  entityType       String
+  entityId         String?
+  before           Json?
+  after            Json?
+  metadata         Json?
+  reason           String?
+  ip               String?
+  userAgent        String?
+  requestId        String?
+  createdAt        DateTime @default(now())
+
+  @@index([organisationId, createdAt])
+  @@index([organisationId, entityType, entityId])
+  @@index([actorUserId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// Platform admins must open a scoped, reasoned, expiring session to view a tenant.
+model SupportAccessSession {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  adminUserId    String
+  reason         String
+  scope          String[]
+  startedAt      DateTime     @default(now())
+  expiresAt      DateTime
+  endedAt        DateTime?
+
+  @@index([organisationId, startedAt])
+  @@index([adminUserId])
+  @@map("support_access_sessions")
+}
+
+// Generic idempotency for payments, imports, bulk mutations, webhooks.
+model IdempotencyKey {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  scope          String // "payments.create", "attendance.bulk"
+  key            String
+  requestHash    String
+  responseStatus Int?
+  responseBody   Json?
+  lockedAt       DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+
+  @@unique([organisationId, scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+// Atomic gapless-ish numbering: UPDATE ... SET nextValue = nextValue + 1 RETURNING.
+model NumberSequence {
+  id             String            @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  key            NumberSequenceKey
+  period         String            @default("") // e.g. "2026" or "" for lifetime
+  prefix         String?
+  nextValue      Int               @default(1)
+
+  @@unique([organisationId, key, period])
+  @@map("number_sequences")
+}
+
+// =============================================================================
+// 3. ACADEMIC STRUCTURE
+// =============================================================================
+
+model AcademicYear {
+  id             String             @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name           String
+  startDate      DateTime           @db.Date
+  endDate        DateTime           @db.Date
+  status         AcademicYearStatus @default(PLANNED)
+  isCurrent      Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  terms         Term[]
+  classGroups   ClassGroup[]
+  enrollments   Enrollment[]
+  assessments   Assessment[]
+  feeStructures FeeStructure[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, name])
+  @@map("academic_years")
+}
+
+model Term {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  name           String
+  startDate      DateTime     @db.Date
+  endDate        DateTime     @db.Date
+  sortOrder      Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assessments Assessment[]
+
+  @@unique([id, organisationId])
+  @@unique([academicYearId, name])
+  @@index([organisationId])
+  @@map("terms")
+}
+
+// Class / Batch / Cohort / Jamaat / Marhala — label is configurable.
+model ClassGroup {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  academicYearId String
+  academicYear   AcademicYear     @relation(fields: [academicYearId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  name           String
+  code           String?
+  description    String?
+  capacity       Int?
+  status         ClassGroupStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sections      Section[]
+  enrollments   Enrollment[]
+  classSubjects ClassSubject[]
+  sessions      ClassSession[]
+  feeStructures FeeStructure[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, academicYearId, name])
+  @@index([organisationId, status])
+  @@map("class_groups")
+}
+
+model Section {
+  id             String     @id @default(uuid(7))
+  organisationId String
+  classGroupId   String
+  classGroup     ClassGroup @relation(fields: [classGroupId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  name           String
+  capacity       Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enrollments Enrollment[]
+  sessions    ClassSession[]
+
+  @@unique([id, organisationId])
+  @@unique([classGroupId, name])
+  @@index([organisationId])
+  @@map("sections")
+}
+
+// Subject / Course / Kitab / Module
+model Subject {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  code           String?
+  name           String
+  category       String?
+  status         RecordStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classSubjects ClassSubject[]
+  syllabusNodes SyllabusNode[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, code])
+  @@unique([organisationId, name])
+  @@map("subjects")
+}
+
+// A subject taught in a class/batch, with its primary teacher.
+model ClassSubject {
+  id                  String       @id @default(uuid(7))
+  organisationId      String
+  classGroupId        String
+  classGroup          ClassGroup   @relation(fields: [classGroupId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  subjectId           String
+  subject             Subject      @relation(fields: [subjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  teacherMembershipId String?
+  teacher             Membership?  @relation(fields: [teacherMembershipId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  weeklyPeriods       Int?
+  metadata            Json?
+  status              RecordStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subjectEnrollments SubjectEnrollment[]
+  sessions           ClassSession[]
+  classProgress      ClassSyllabusProgress[]
+  homework           Homework[]
+  assessmentSubjects AssessmentSubject[]
+  feeStructures      FeeStructure[]
+
+  @@unique([id, organisationId])
+  @@unique([classGroupId, subjectId])
+  @@index([organisationId, teacherMembershipId])
+  @@index([subjectId])
+  @@map("class_subjects")
+}
+
+// =============================================================================
+// 4. STUDENTS & GUARDIANS
+// =============================================================================
+
+model Student {
+  id              String        @id @default(uuid(7))
+  organisationId  String
+  organisation    Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  studentCode     String // admission number, unique per organisation
+  name            String
+  nameBn          String? // future Bangla support
+  photoUrl        String?
+  photoPublicId   String?
+  dateOfBirth     DateTime?     @db.Date
+  gender          Gender?
+  phone           String?
+  email           String?
+  address         String?
+  admissionDate   DateTime?     @db.Date
+  status          StudentStatus @default(ACTIVE)
+  statusChangedAt DateTime?
+  customFields    Json? // values for CustomFieldDefinition (STUDENT)
+  archivedAt      DateTime?
+  deletedAt       DateTime?
+  createdById     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guardians           StudentGuardian[]
+  enrollments         Enrollment[]
+  subjectEnrollments  SubjectEnrollment[]
+  tags                StudentTag[]
+  notes               StudentNote[]
+  documents           StudentDocument[]
+  attendance          AttendanceRecord[]
+  masteries           StudentMastery[]
+  homeworkAssignments HomeworkAssignment[]
+  marks               StudentMark[]
+  results             StudentResult[]
+  feeAssignments      StudentFeeAssignment[]
+  invoices            Invoice[]
+  payments            Payment[]
+  adjustments         FinancialAdjustment[]
+  shareLinks          ShareLink[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, studentCode])
+  @@index([organisationId, status])
+  @@index([organisationId, name])
+  @@index([organisationId, phone])
+  @@index([organisationId, deletedAt])
+  @@map("students")
+}
+
+model Guardian {
+  id               String               @id @default(uuid(7))
+  organisationId   String
+  organisation     Organisation         @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name             String
+  nameBn           String?
+  phone            String?
+  email            String?
+  address          String?
+  occupation       String?
+  preferredChannel CommunicationChannel @default(SMS)
+  customFields     Json?
+  deletedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students StudentGuardian[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, phone])
+  @@index([organisationId, name])
+  @@map("guardians")
+}
+
+model StudentGuardian {
+  id                    String               @id @default(uuid(7))
+  organisationId        String
+  studentId             String
+  student               Student              @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  guardianId            String
+  guardian              Guardian             @relation(fields: [guardianId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  relationship          GuardianRelationship
+  isPrimary             Boolean              @default(false)
+  receivesNotifications Boolean              @default(true)
+  canViewReports        Boolean              @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, guardianId])
+  @@index([organisationId, guardianId])
+  @@map("student_guardians")
+}
+
+model Tag {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name           String
+  color          String?
+
+  createdAt DateTime @default(now())
+
+  students StudentTag[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, name])
+  @@map("tags")
+}
+
+model StudentTag {
+  organisationId String
+  studentId      String
+  student        Student  @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  tagId          String
+  tag            Tag      @relation(fields: [tagId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@id([studentId, tagId])
+  @@index([organisationId, tagId])
+  @@map("student_tags")
+}
+
+model StudentNote {
+  id             String         @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student        @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  authorId       String // User.id
+  body           String
+  visibility     NoteVisibility @default(STAFF_ONLY)
+  deletedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organisationId, studentId])
+  @@map("student_notes")
+}
+
+model StudentDocument {
+  id              String       @id @default(uuid(7))
+  organisationId  String
+  studentId       String
+  student         Student      @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  type            DocumentType @default(OTHER)
+  title           String
+  storageKey      String // Cloudinary public_id / S3 key; serve via signed URL only
+  storageProvider String       @default("cloudinary")
+  mimeType        String
+  sizeBytes       Int
+  uploadedById    String
+  deletedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organisationId, studentId])
+  @@map("student_documents")
+}
+
+// A student can have many enrolments across classes and years.
+model Enrollment {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student          @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  classGroupId   String
+  classGroup     ClassGroup       @relation(fields: [classGroupId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  sectionId      String?
+  section        Section?         @relation(fields: [sectionId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  academicYearId String
+  academicYear   AcademicYear     @relation(fields: [academicYearId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  rollNumber     String?
+  startDate      DateTime         @db.Date
+  endDate        DateTime?        @db.Date
+  status         EnrollmentStatus @default(ACTIVE)
+  note           String?
+  createdById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, organisationId])
+  @@unique([studentId, classGroupId])
+  @@index([organisationId, classGroupId, status])
+  @@index([organisationId, academicYearId])
+  @@index([studentId])
+  @@map("enrollments")
+}
+
+// Optional subject-level assignment (electives, per-course study).
+model SubjectEnrollment {
+  id             String                  @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student                 @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  classSubjectId String
+  classSubject   ClassSubject            @relation(fields: [classSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  status         SubjectEnrollmentStatus @default(ACTIVE)
+  startDate      DateTime?               @db.Date
+  endDate        DateTime?               @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, classSubjectId])
+  @@index([organisationId, classSubjectId])
+  @@map("subject_enrollments")
+}
+
+// =============================================================================
+// 5. SESSIONS, ATTENDANCE, SYLLABUS, HOMEWORK
+// =============================================================================
+
+// For DAILY attendance mode, create one session per class per day with
+// classSubjectId = null.
+model SessionRecurrence {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  rrule          String // RFC 5545 RRULE
+  startDate      DateTime     @db.Date
+  untilDate      DateTime?    @db.Date
+  timezone       String       @default("Asia/Dhaka")
+  template       Json // classGroupId, classSubjectId, teacher, room, times
+  createdById    String?
+
+  createdAt DateTime @default(now())
+
+  sessions ClassSession[]
+
+  @@unique([id, organisationId])
+  @@map("session_recurrences")
+}
+
+model ClassSession {
+  id                          String             @id @default(uuid(7))
+  organisationId              String
+  classGroupId                String
+  classGroup                  ClassGroup         @relation(fields: [classGroupId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  sectionId                   String?
+  section                     Section?           @relation(fields: [sectionId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  classSubjectId              String?
+  classSubject                ClassSubject?      @relation(fields: [classSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  teacherMembershipId         String?
+  teacher                     Membership?        @relation("SessionTeacher", fields: [teacherMembershipId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  originalTeacherMembershipId String? // set when a substitute takes the session
+  originalTeacher             Membership?        @relation("SessionOriginalTeacher", fields: [originalTeacherMembershipId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  recurrenceId                String?
+  recurrence                  SessionRecurrence? @relation(fields: [recurrenceId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  rescheduledFromId           String?
+  rescheduledFrom             ClassSession?      @relation("SessionReschedule", fields: [rescheduledFromId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  rescheduledTo               ClassSession[]     @relation("SessionReschedule")
+
+  startsAt           DateTime // stored UTC; render in organisation timezone
+  endsAt             DateTime
+  status             SessionStatus @default(SCHEDULED)
+  room               String?
+  title              String?
+  topicSummary       String?
+  notes              String?
+  cancellationReason String?
+  attendanceLockedAt DateTime?
+  createdById        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendance AttendanceRecord[]
+  topics     SessionSyllabusNode[]
+  homework   Homework[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, startsAt])
+  @@index([organisationId, classGroupId, startsAt])
+  @@index([organisationId, teacherMembershipId, startsAt])
+  @@index([organisationId, classSubjectId, startsAt])
+  @@map("class_sessions")
+}
+
+model AttendanceRecord {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  sessionId      String
+  session        ClassSession     @relation(fields: [sessionId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  studentId      String
+  student        Student          @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  attendanceDate DateTime         @db.Date // denormalised from session for fast range reports
+  status         AttendanceStatus
+  note           String?
+  evidenceKey    String?
+  markedById     String // User.id
+  markedAt       DateTime         @default(now())
+  version        Int              @default(1) // optimistic locking
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  history AttendanceRecordHistory[]
+
+  @@unique([id, organisationId])
+  @@unique([sessionId, studentId])
+  @@index([organisationId, studentId, attendanceDate])
+  @@index([organisationId, attendanceDate, status])
+  @@map("attendance_records")
+}
+
+model AttendanceRecordHistory {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  recordId       String
+  record         AttendanceRecord @relation(fields: [recordId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  previousStatus AttendanceStatus
+  newStatus      AttendanceStatus
+  previousNote   String?
+  reason         String?
+  changedById    String
+  changedAt      DateTime         @default(now())
+
+  @@index([organisationId, recordId])
+  @@map("attendance_record_history")
+}
+
+// Subject > chapter > topic > lesson/task (tree via parentId).
+model SyllabusNode {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  subjectId      String
+  subject        Subject          @relation(fields: [subjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  parentId       String?
+  parent         SyllabusNode?    @relation("SyllabusTree", fields: [parentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  children       SyllabusNode[]   @relation("SyllabusTree")
+  type           SyllabusNodeType
+  title          String
+  description    String?
+  sortOrder      Int              @default(0)
+  targetDate     DateTime?        @db.Date
+  deletedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classProgress ClassSyllabusProgress[]
+  masteries     StudentMastery[]
+  sessionTopics SessionSyllabusNode[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, subjectId, parentId, sortOrder])
+  @@map("syllabus_nodes")
+}
+
+model SessionSyllabusNode {
+  organisationId String
+  sessionId      String
+  session        ClassSession @relation(fields: [sessionId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  syllabusNodeId String
+  syllabusNode   SyllabusNode @relation(fields: [syllabusNodeId, organisationId], references: [id, organisationId], onDelete: Cascade)
+
+  @@id([sessionId, syllabusNodeId])
+  @@index([organisationId, syllabusNodeId])
+  @@map("session_syllabus_nodes")
+}
+
+// Class-level coverage of a syllabus node.
+model ClassSyllabusProgress {
+  id             String         @id @default(uuid(7))
+  organisationId String
+  classSubjectId String
+  classSubject   ClassSubject   @relation(fields: [classSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  syllabusNodeId String
+  syllabusNode   SyllabusNode   @relation(fields: [syllabusNodeId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  status         ProgressStatus @default(PLANNED)
+  percentage     Int?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  teacherNote    String?
+  nextTarget     String?
+  updatedById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([classSubjectId, syllabusNodeId])
+  @@index([organisationId, status])
+  @@map("class_syllabus_progress")
+}
+
+// Optional per-student mastery of a syllabus node.
+model StudentMastery {
+  id             String         @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student        @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  syllabusNodeId String
+  syllabusNode   SyllabusNode   @relation(fields: [syllabusNodeId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  status         ProgressStatus @default(PLANNED)
+  level          Int? // 0-100 or competency level
+  note           String?
+  updatedById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, syllabusNodeId])
+  @@index([organisationId, syllabusNodeId])
+  @@map("student_mastery")
+}
+
+model Homework {
+  id             String        @id @default(uuid(7))
+  organisationId String
+  classSubjectId String
+  classSubject   ClassSubject  @relation(fields: [classSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  sessionId      String?
+  session        ClassSession? @relation(fields: [sessionId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  title          String
+  instructions   String?
+  dueAt          DateTime
+  maxMarks       Decimal?      @db.Decimal(7, 2)
+  attachments    Json? // [{ key, name, size, mime }]
+  assignedToAll  Boolean       @default(true)
+  createdById    String
+  deletedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments HomeworkAssignment[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, classSubjectId, dueAt])
+  @@map("homework")
+}
+
+model HomeworkAssignment {
+  id                        String         @id @default(uuid(7))
+  organisationId            String
+  homeworkId                String
+  homework                  Homework       @relation(fields: [homeworkId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  studentId                 String
+  student                   Student        @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  status                    HomeworkStatus @default(ASSIGNED)
+  submittedAt               DateTime?
+  isOfflineSubmission       Boolean        @default(false)
+  marks                     Decimal?       @db.Decimal(7, 2)
+  feedback                  String?
+  feedbackVisibleToGuardian Boolean        @default(false)
+  reviewedById              String?
+  reviewedAt                DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([homeworkId, studentId])
+  @@index([organisationId, studentId, status])
+  @@map("homework_assignments")
+}
+
+// =============================================================================
+// 6. ASSESSMENT & RESULTS
+// =============================================================================
+
+model GradeScale {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name           String
+  usesGpa        Boolean      @default(false)
+  maxGpa         Decimal?     @db.Decimal(4, 2)
+  isDefault      Boolean      @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bands       GradeBand[]
+  assessments Assessment[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, name])
+  @@map("grade_scales")
+}
+
+model GradeBand {
+  id             String     @id @default(uuid(7))
+  organisationId String
+  gradeScaleId   String
+  gradeScale     GradeScale @relation(fields: [gradeScaleId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  grade          String // "A+", "Excellent", "Level 3"
+  minPercent     Decimal    @db.Decimal(5, 2)
+  maxPercent     Decimal    @db.Decimal(5, 2)
+  gradePoint     Decimal?   @db.Decimal(4, 2)
+  isPass         Boolean    @default(true)
+  sortOrder      Int        @default(0)
+
+  @@index([gradeScaleId, minPercent])
+  @@index([organisationId])
+  @@map("grade_bands")
+}
+
+// CT, weekly test, monthly, term, model test, oral, practical, assignment...
+model AssessmentType {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name           String
+  code           String
+  defaultWeight  Decimal?     @db.Decimal(5, 2)
+  isActive       Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assessments Assessment[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, code])
+  @@map("assessment_types")
+}
+
+model Assessment {
+  id                 String               @id @default(uuid(7))
+  organisationId     String
+  academicYearId     String
+  academicYear       AcademicYear         @relation(fields: [academicYearId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  termId             String?
+  term               Term?                @relation(fields: [termId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  assessmentTypeId   String
+  assessmentType     AssessmentType       @relation(fields: [assessmentTypeId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  gradeScaleId       String?
+  gradeScale         GradeScale?          @relation(fields: [gradeScaleId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  name               String
+  startDate          DateTime?            @db.Date
+  endDate            DateTime?            @db.Date
+  status             ResultWorkflowStatus @default(DRAFT)
+  reviewedById       String?
+  reviewedAt         DateTime?
+  approvedById       String?
+  approvedAt         DateTime?
+  scheduledPublishAt DateTime?
+  createdById        String
+  deletedAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subjects     AssessmentSubject[]
+  publications ResultPublication[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, academicYearId, status])
+  @@map("assessments")
+}
+
+model AssessmentSubject {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  assessmentId   String
+  assessment     Assessment   @relation(fields: [assessmentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  classSubjectId String
+  classSubject   ClassSubject @relation(fields: [classSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  totalMarks     Decimal      @db.Decimal(7, 2)
+  passMarks      Decimal      @db.Decimal(7, 2)
+  weight         Decimal?     @db.Decimal(5, 2)
+  examDate       DateTime?    @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  components MarkComponent[]
+  marks      StudentMark[]
+
+  @@unique([id, organisationId])
+  @@unique([assessmentId, classSubjectId])
+  @@index([organisationId, classSubjectId])
+  @@map("assessment_subjects")
+}
+
+// Theory / practical / oral parts of one subject exam.
+model MarkComponent {
+  id                  String            @id @default(uuid(7))
+  organisationId      String
+  assessmentSubjectId String
+  assessmentSubject   AssessmentSubject @relation(fields: [assessmentSubjectId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  name                String
+  maxMarks            Decimal           @db.Decimal(7, 2)
+  passMarks           Decimal?          @db.Decimal(7, 2)
+  sortOrder           Int               @default(0)
+
+  componentMarks StudentMarkComponent[]
+
+  @@unique([id, organisationId])
+  @@unique([assessmentSubjectId, name])
+  @@map("mark_components")
+}
+
+model StudentMark {
+  id                  String            @id @default(uuid(7))
+  organisationId      String
+  assessmentSubjectId String
+  assessmentSubject   AssessmentSubject @relation(fields: [assessmentSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  studentId           String
+  student             Student           @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  status              MarkStatus        @default(ENTERED)
+  marks               Decimal?          @db.Decimal(7, 2) // total (sum of components when used)
+  grade               String?
+  gradePoint          Decimal?          @db.Decimal(4, 2)
+  isOverridden        Boolean           @default(false)
+  overrideReason      String? // mandatory when isOverridden
+  overriddenById      String?
+  enteredById         String
+  version             Int               @default(1) // optimistic locking for concurrent entry
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  componentMarks StudentMarkComponent[]
+
+  @@unique([id, organisationId])
+  @@unique([assessmentSubjectId, studentId])
+  @@index([organisationId, studentId])
+  @@map("student_marks")
+}
+
+model StudentMarkComponent {
+  id              String        @id @default(uuid(7))
+  organisationId  String
+  studentMarkId   String
+  studentMark     StudentMark   @relation(fields: [studentMarkId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  markComponentId String
+  markComponent   MarkComponent @relation(fields: [markComponentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  marks           Decimal?      @db.Decimal(7, 2)
+
+  @@unique([studentMarkId, markComponentId])
+  @@index([organisationId])
+  @@map("student_mark_components")
+}
+
+// One row per publish. Re-publishing creates version + 1 and supersedes the old one.
+model ResultPublication {
+  id             String     @id @default(uuid(7))
+  organisationId String
+  assessmentId   String
+  assessment     Assessment @relation(fields: [assessmentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  version        Int
+  publishedById  String
+  publishedAt    DateTime   @default(now())
+  changeReason   String? // required for version > 1
+  supersededAt   DateTime?
+  configSnapshot Json // grade scale, pass rules, position settings used
+
+  results StudentResult[]
+
+  @@unique([id, organisationId])
+  @@unique([assessmentId, version])
+  @@index([organisationId, assessmentId])
+  @@map("result_publications")
+}
+
+// Immutable snapshot of each student's result at publication time.
+model StudentResult {
+  id             String            @id @default(uuid(7))
+  organisationId String
+  publicationId  String
+  publication    ResultPublication @relation(fields: [publicationId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  studentId      String
+  student        Student           @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  totalMarks     Decimal           @db.Decimal(9, 2)
+  obtainedMarks  Decimal           @db.Decimal(9, 2)
+  percentage     Decimal           @db.Decimal(5, 2)
+  gpa            Decimal?          @db.Decimal(4, 2)
+  grade          String?
+  position       Int?
+  outcome        ResultOutcome
+  subjectResults Json // per-subject marks, grade, pass/fail snapshot
+
+  createdAt DateTime @default(now())
+
+  @@unique([publicationId, studentId])
+  @@index([organisationId, studentId])
+  @@map("student_results")
+}
+
+// =============================================================================
+// 7. STUDENT FINANCE (all amounts in poisha)
+// =============================================================================
+
+model FeeCategory {
+  id             String        @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  name           String
+  code           String?
+  recurrence     FeeRecurrence @default(ONE_TIME)
+  isActive       Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  structures   FeeStructure[]
+  invoiceItems InvoiceItem[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, name])
+  @@map("fee_categories")
+}
+
+model FeeStructure {
+  id             String        @id @default(uuid(7))
+  organisationId String
+  feeCategoryId  String
+  feeCategory    FeeCategory   @relation(fields: [feeCategoryId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  classGroupId   String?
+  classGroup     ClassGroup?   @relation(fields: [classGroupId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  classSubjectId String?
+  classSubject   ClassSubject? @relation(fields: [classSubjectId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  academicYearId String?
+  academicYear   AcademicYear? @relation(fields: [academicYearId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  name           String
+  amount         Int // poisha
+  dueDayOfMonth  Int?
+  effectiveFrom  DateTime      @db.Date
+  effectiveTo    DateTime?     @db.Date
+  isActive       Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments StudentFeeAssignment[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, classGroupId])
+  @@index([organisationId, isActive])
+  @@map("fee_structures")
+}
+
+model StudentFeeAssignment {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student      @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  feeStructureId String
+  feeStructure   FeeStructure @relation(fields: [feeStructureId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  amount         Int // agreed amount snapshot, poisha
+  discountAmount Int          @default(0)
+  discountReason String?
+  isScholarship  Boolean      @default(false)
+  startDate      DateTime     @db.Date
+  endDate        DateTime?    @db.Date
+  status         RecordStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoiceItems InvoiceItem[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, studentId, status])
+  @@index([feeStructureId])
+  @@map("student_fee_assignments")
+}
+
+model Invoice {
+  id             String        @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student       @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  invoiceNo      String
+  issueDate      DateTime      @db.Date
+  dueDate        DateTime      @db.Date
+  billingPeriod  String? // "2026-07" for monthly invoices
+  subtotal       Int           @default(0)
+  discountTotal  Int           @default(0)
+  fineTotal      Int           @default(0)
+  total          Int           @default(0)
+  paidAmount     Int           @default(0)
+  balance        Int           @default(0) // CHECK balance >= 0 (constraints.sql)
+  status         InvoiceStatus @default(DRAFT)
+  note           String?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  createdById    String?
+  version        Int           @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items       InvoiceItem[]
+  allocations PaymentAllocation[]
+  adjustments FinancialAdjustment[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, invoiceNo])
+  @@index([organisationId, status, dueDate])
+  @@index([organisationId, studentId, status])
+  @@index([organisationId, issueDate])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                     String                @id @default(uuid(7))
+  organisationId         String
+  invoiceId              String
+  invoice                Invoice               @relation(fields: [invoiceId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  feeCategoryId          String
+  feeCategory            FeeCategory           @relation(fields: [feeCategoryId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  studentFeeAssignmentId String?
+  studentFeeAssignment   StudentFeeAssignment? @relation(fields: [studentFeeAssignmentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  billingPeriod          String?
+  description            String
+  amount                 Int
+  discount               Int                   @default(0)
+  fine                   Int                   @default(0)
+
+  // Idempotent generation: the same assignment can't be billed twice for a period.
+  @@unique([studentFeeAssignmentId, billingPeriod])
+  @@index([organisationId, invoiceId])
+  @@index([feeCategoryId])
+  @@map("invoice_items")
+}
+
+// Immutable once created. Reversal = status REVERSED + PAYMENT_REVERSAL adjustment.
+model Payment {
+  id             String        @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student       @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  receiptNo      String
+  amount         Int // poisha, > 0
+  method         PaymentMethod
+  reference      String? // bKash/Nagad trxID, bank ref
+  paidAt         DateTime
+  collectedById  String // User.id
+  status         PaymentStatus @default(COMPLETED)
+  note           String?
+  idempotencyKey String?
+  reversedAt     DateTime?
+  reversedById   String?
+  reversalReason String?
+
+  createdAt DateTime @default(now())
+
+  allocations PaymentAllocation[]
+  adjustments FinancialAdjustment[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId, receiptNo])
+  @@unique([organisationId, idempotencyKey])
+  @@index([organisationId, paidAt])
+  @@index([organisationId, studentId])
+  @@index([organisationId, method, paidAt])
+  @@index([organisationId, collectedById, paidAt])
+  @@map("payments")
+}
+
+// amount - SUM(allocations) on a payment = unallocated student credit.
+model PaymentAllocation {
+  id             String  @id @default(uuid(7))
+  organisationId String
+  paymentId      String
+  payment        Payment @relation(fields: [paymentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  amount         Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([paymentId, invoiceId])
+  @@index([organisationId, invoiceId])
+  @@map("payment_allocations")
+}
+
+model FinancialAdjustment {
+  id             String         @id @default(uuid(7))
+  organisationId String
+  studentId      String
+  student        Student        @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  invoiceId      String?
+  invoice        Invoice?       @relation(fields: [invoiceId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  paymentId      String?
+  payment        Payment?       @relation(fields: [paymentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  type           AdjustmentType
+  amount         Int // always positive; `type` defines the direction
+  reason         String
+  reference      String?
+  createdById    String
+  approvedById   String?
+  approvedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organisationId, studentId])
+  @@index([organisationId, type, createdAt])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@map("financial_adjustments")
+}
+
+// Stretch item for MVP; simple cashflow only, not accounting.
+model Expense {
+  id             String         @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  category       String
+  amount         Int
+  expenseDate    DateTime       @db.Date
+  payee          String?
+  method         PaymentMethod?
+  note           String?
+  createdById    String
+  deletedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organisationId, expenseDate])
+  @@map("expenses")
+}
+
+// =============================================================================
+// 8. COMMUNICATION, SHARING, JOBS
+// =============================================================================
+
+model Notice {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  title          String
+  body           String
+  status         NoticeStatus @default(DRAFT)
+  isPinned       Boolean      @default(false)
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdById    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  targets NoticeTarget[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, status, publishedAt])
+  @@map("notices")
+}
+
+model NoticeTarget {
+  id             String           @id @default(uuid(7))
+  organisationId String
+  noticeId       String
+  notice         Notice           @relation(fields: [noticeId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  targetType     NoticeTargetType
+  targetId       String? // roleId / classGroupId / membershipId
+
+  @@index([organisationId, noticeId])
+  @@index([organisationId, targetType, targetId])
+  @@map("notice_targets")
+}
+
+model InAppNotification {
+  id             String     @id @default(uuid(7))
+  organisationId String
+  membershipId   String
+  membership     Membership @relation(fields: [membershipId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  title          String
+  body           String?
+  link           String?
+  readAt         DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([membershipId, readAt])
+  @@index([organisationId, createdAt])
+  @@map("in_app_notifications")
+}
+
+model MessageTemplate {
+  id             String               @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation         @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  key            String // "absence_alert", "fee_due_reminder", "result_published"
+  channel        CommunicationChannel
+  name           String
+  subject        String?
+  body           String // supports {{studentName}}, {{amountDue}}, {{examName}}
+  variables      String[]
+  isActive       Boolean              @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, key, channel])
+  @@map("message_templates")
+}
+
+// Log-style table: references are intentionally soft (no FKs) so delivery
+// history survives deletions and stays cheap to write.
+model NotificationDelivery {
+  id                String               @id @default(uuid(7))
+  organisationId    String
+  organisation      Organisation         @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  channel           CommunicationChannel
+  status            DeliveryStatus       @default(QUEUED)
+  event             String // "ABSENCE_ALERT", "FEE_REMINDER", "RESULT_PUBLISHED", "NOTICE"
+  recipientAddress  String // phone / email
+  studentId         String?
+  guardianId        String?
+  noticeId          String?
+  templateId        String?
+  subject           String?
+  body              String
+  provider          String?
+  providerMessageId String?
+  dedupeKey         String? // e.g. "absence:<sessionId>:<studentId>"
+  attempts          Int                  @default(0)
+  lastError         String?
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  nextRetryAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organisationId, dedupeKey])
+  @@index([organisationId, status, nextRetryAt])
+  @@index([organisationId, studentId])
+  @@index([organisationId, createdAt])
+  @@map("notification_deliveries")
+}
+
+// Revocable, expiring public links to ONE report. No student/guardian accounts in MVP.
+model ShareLink {
+  id             String          @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  tokenHash      String // SHA-256 of a high-entropy token; raw token shown once
+  reportType     ShareReportType
+  studentId      String?
+  student        Student?        @relation(fields: [studentId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  resourceId     String? // invoice / payment / publication / assessment id
+  params         Json? // date range, academic year, etc. — fixed at creation
+  expiresAt      DateTime?
+  maxViews       Int?
+  viewCount      Int             @default(0)
+  lastViewedAt   DateTime?
+  revokedAt      DateTime?
+  revokedById    String?
+  createdById    String
+
+  createdAt DateTime @default(now())
+
+  accesses ShareLinkAccess[]
+
+  @@unique([id, organisationId])
+  @@unique([tokenHash])
+  @@index([organisationId, reportType])
+  @@index([organisationId, studentId])
+  @@map("share_links")
+}
+
+model ShareLinkAccess {
+  id             String    @id @default(uuid(7))
+  organisationId String
+  shareLinkId    String
+  shareLink      ShareLink @relation(fields: [shareLinkId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  success        Boolean   @default(true)
+  ip             String?
+  userAgent      String?
+  accessedAt     DateTime  @default(now())
+
+  @@index([shareLinkId, accessedAt])
+  @@map("share_link_accesses")
+}
+
+model ImportJob {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  type           ImportType
+  status         JobStatus    @default(QUEUED)
+  fileKey        String
+  originalName   String
+  totalRows      Int          @default(0)
+  validRows      Int          @default(0)
+  errorRows      Int          @default(0)
+  importedRows   Int          @default(0)
+  options        Json? // conflict strategy: skip | update | fail
+  summary        Json?
+  createdById    String
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  expiresAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  errors ImportRowError[]
+
+  @@unique([id, organisationId])
+  @@index([organisationId, status, createdAt])
+  @@map("import_jobs")
+}
+
+model ImportRowError {
+  id             String    @id @default(uuid(7))
+  organisationId String
+  jobId          String
+  job            ImportJob @relation(fields: [jobId, organisationId], references: [id, organisationId], onDelete: Cascade)
+  rowNumber      Int
+  field          String?
+  message        String
+  rawData        Json?
+
+  @@index([jobId, rowNumber])
+  @@map("import_row_errors")
+}
+
+model ExportJob {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  reportType     String // "fees.due", "attendance.summary"
+  format         ExportFormat
+  status         JobStatus    @default(QUEUED)
+  params         Json?
+  progress       Int          @default(0)
+  fileKey        String?
+  fileSizeBytes  Int?
+  error          String?
+  requestedById  String
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  expiresAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organisationId, status, createdAt])
+  @@index([organisationId, requestedById])
+  @@map("export_jobs")
+}
+
+// =============================================================================
+// 9. SAAS BILLING (ShikkhaFlow subscriptions — separate from student fees)
+// =============================================================================
+
+// entitlements Json shape (validate with Zod):
+// { maxStudents: 500, maxStaff: 5, smsCredits: 0, enabledModules: ["attendance","fees",...] }
+// Business logic reads entitlements; it must never branch on plan name/code.
+model Plan {
+  id           String       @id @default(uuid(7))
+  code         String
+  name         String
+  description  String?
+  entitlements Json
+  trialDays    Int?
+  isPublic     Boolean      @default(true)
+  status       RecordStatus @default(ACTIVE)
+  sortOrder    Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prices               PlanPrice[]
+  subscriptions        Subscription[] @relation("SubscriptionPlan")
+  pendingSubscriptions Subscription[] @relation("SubscriptionPendingPlan")
+
+  @@unique([code])
+  @@map("plans")
+}
+
+model PlanPrice {
+  id       String          @id @default(uuid(7))
+  planId   String
+  plan     Plan            @relation(fields: [planId], references: [id], onDelete: Restrict)
+  interval BillingInterval
+  amount   Int // poisha
+  currency String          @default("BDT")
+  isActive Boolean         @default(true)
+
+  createdAt DateTime @default(now())
+
+  subscriptions        Subscription[] @relation("SubscriptionPrice")
+  pendingSubscriptions Subscription[] @relation("SubscriptionPendingPrice")
+
+  @@unique([planId, interval])
+  @@map("plan_prices")
+}
+
+// One row per organisation; history lives in SubscriptionEvent.
+model Subscription {
+  id                   String             @id @default(uuid(7))
+  organisationId       String
+  organisation         Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  planId               String
+  plan                 Plan               @relation("SubscriptionPlan", fields: [planId], references: [id], onDelete: Restrict)
+  priceId              String?
+  price                PlanPrice?         @relation("SubscriptionPrice", fields: [priceId], references: [id], onDelete: Restrict)
+  status               SubscriptionStatus @default(TRIALING)
+  trialStartsAt        DateTime?
+  trialEndsAt          DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  cancelledAt          DateTime?
+  gracePeriodEndsAt    DateTime? // read-only grace after failed payment
+  suspendedAt          DateTime?
+  pendingPlanId        String? // downgrade applied at next period
+  pendingPlan          Plan?              @relation("SubscriptionPendingPlan", fields: [pendingPlanId], references: [id], onDelete: Restrict)
+  pendingPriceId       String?
+  pendingPrice         PlanPrice?         @relation("SubscriptionPendingPrice", fields: [pendingPriceId], references: [id], onDelete: Restrict)
+  entitlementOverrides Json? // per-customer deals (enterprise)
+  provider             String?
+  providerRef          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events   SubscriptionEvent[]
+  invoices SubscriptionInvoice[]
+
+  @@unique([id, organisationId])
+  @@unique([organisationId])
+  @@index([status, currentPeriodEnd])
+  @@index([status, trialEndsAt])
+  @@map("subscriptions")
+}
+
+model SubscriptionEvent {
+  id             String              @id @default(uuid(7))
+  organisationId String
+  subscriptionId String
+  subscription   Subscription        @relation(fields: [subscriptionId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  type           String // "trial_started", "upgraded", "payment_failed", "suspended"
+  fromStatus     SubscriptionStatus?
+  toStatus       SubscriptionStatus?
+  data           Json?
+  actorUserId    String?
+  createdAt      DateTime            @default(now())
+
+  @@index([subscriptionId, createdAt])
+  @@index([organisationId, createdAt])
+  @@map("subscription_events")
+}
+
+model SubscriptionInvoice {
+  id             String                    @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation              @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  subscriptionId String
+  subscription   Subscription              @relation(fields: [subscriptionId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  invoiceNo      String
+  planCode       String // snapshot
+  interval       BillingInterval
+  description    String?
+  amount         Int // poisha
+  currency       String                    @default("BDT")
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         SubscriptionInvoiceStatus @default(OPEN)
+  dueAt          DateTime?
+  paidAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments SubscriptionPayment[]
+
+  @@unique([id, organisationId])
+  @@unique([invoiceNo])
+  @@index([organisationId, status])
+  @@index([subscriptionId, periodStart])
+  @@map("subscription_invoices")
+}
+
+// One row per gateway attempt.
+model SubscriptionPayment {
+  id                    String               @id @default(uuid(7))
+  organisationId        String
+  invoiceId             String
+  invoice               SubscriptionInvoice  @relation(fields: [invoiceId, organisationId], references: [id, organisationId], onDelete: Restrict)
+  provider              String // "sslcommerz" | "bkash" | "nagad" ... (confirm gateway)
+  providerPaymentId     String?
+  providerTransactionId String?
+  amount                Int
+  currency              String               @default("BDT")
+  status                GatewayPaymentStatus @default(INITIATED)
+  checkoutUrl           String?
+  failureReason         String?
+  rawResponse           Json? // sanitised; never store card/secret data
+  initiatedAt           DateTime             @default(now())
+  completedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerPaymentId])
+  @@index([organisationId, status])
+  @@index([invoiceId])
+  @@map("subscription_payments")
+}
+
+// Idempotent webhook processing: unique(provider, eventId).
+model PaymentWebhookEvent {
+  id             String        @id @default(uuid(7))
+  provider       String
+  eventId        String
+  eventType      String?
+  payload        Json
+  signatureValid Boolean?
+  status         WebhookStatus @default(RECEIVED)
+  attempts       Int           @default(0)
+  error          String?
+  receivedAt     DateTime      @default(now())
+  processedAt    DateTime?
+
+  @@unique([provider, eventId])
+  @@index([status, receivedAt])
+  @@map("payment_webhook_events")
+}
+
+// metric: "students" | "staff" | "smsCredits" ... period: "lifetime" or "2026-07".
+// Keep in sync inside the same transaction as the create/delete it counts.
+model UsageCounter {
+  id             String       @id @default(uuid(7))
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  metric         String
+  period         String       @default("lifetime")
+  used           Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organisationId, metric, period])
+  @@map("usage_counters")
+}
+
+model FeatureFlag {
+  id             String  @id @default(uuid(7))
+  key            String
+  description    String?
+  enabled        Boolean @default(false)
+  rolloutPercent Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  overrides FeatureFlagOverride[]
+
+  @@unique([key])
+  @@map("feature_flags")
+}
+
+model FeatureFlagOverride {
+  id             String       @id @default(uuid(7))
+  flagId         String
+  flag           FeatureFlag  @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  enabled        Boolean
+
+  @@unique([flagId, organisationId])
+  @@map("feature_flag_overrides")
+}

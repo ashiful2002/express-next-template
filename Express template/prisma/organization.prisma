@@ -1,0 +1,82 @@
+model Organisation {
+    id                    String             @id @default(uuid(7))
+    name                  String
+    slug                  String
+    type                  OrganisationType
+    logoUrl               String?
+    email                 String?
+    phone                 String?
+    address               String?
+    timezone              String             @default("Asia/Dhaka")
+    currency              String             @default("BDT")
+    language              String             @default("en")
+    dateFormat            String             @default("DD/MM/YYYY")
+    status                OrganisationStatus @default(ONBOARDING)
+    onboardingCompletedAt DateTime?
+    suspendedAt           DateTime?
+    suspensionReason      String?
+    createdById           String
+    deletedAt             DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // root-tenant back-relations
+    sessions               Session[]
+    settings               OrganisationSettings?
+    subscription           Subscription?
+    roles                  Role[]
+    memberships            Membership[]
+    invitations            Invitation[]
+    terminology            TerminologyLabel[]
+    customFields           CustomFieldDefinition[]
+    gradeScales            GradeScale[]
+    academicYears          AcademicYear[]
+    subjects               Subject[]
+    students               Student[]
+    guardians              Guardian[]
+    tags                   Tag[]
+    sessionRecurrences     SessionRecurrence[]
+    assessmentTypes        AssessmentType[]
+    feeCategories          FeeCategory[]
+    expenses               Expense[]
+    notices                Notice[]
+    messageTemplates       MessageTemplate[]
+    notificationDeliveries NotificationDelivery[]
+    shareLinks             ShareLink[]
+    importJobs             ImportJob[]
+    exportJobs             ExportJob[]
+    idempotencyKeys        IdempotencyKey[]
+    numberSequences        NumberSequence[]
+    subscriptionInvoices   SubscriptionInvoice[]
+    usageCounters          UsageCounter[]
+    featureFlagOverrides   FeatureFlagOverride[]
+    supportAccessSessions  SupportAccessSession[]
+
+    @@unique([slug])
+    @@index([status])
+    @@map("organisations")
+}
+
+model OrganisationSettings {
+    organisationId String       @id
+    organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+    attendanceMode         AttendanceMode @default(SESSION)
+    lowAttendanceThreshold Int            @default(75) // percent
+    absenceAlertsEnabled   Boolean        @default(false)
+
+    positionEnabled  Boolean       @default(false)
+    positionScope    PositionScope @default(CLASS_GROUP)
+    roundingDecimals Int           @default(2)
+    gradingRules     Json?
+
+    reportBranding Json? 
+
+    extra Json?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("organisation_settings")
+}

@@ -1,12 +1,362 @@
 enum UserRole {
- SUPER_ADMIN
- ADMIN
- TRADER
- CUSTOMER
+    SUPER_ADMIN
+    USER
 }
 
 enum UserStatus {
-BLOCKED
-DELETED
-ACTIVE
+    ACTIVE
+    BLOCKED
+    DELETED
+}
+
+enum OrganisationType {
+    TUTOR
+    COACHING_CENTRE
+    SCHOOL
+    COLLEGE
+    MADRASA
+    TRAINING_CENTRE
+    OTHER
+}
+
+enum OrganisationStatus {
+    ONBOARDING
+    ACTIVE
+    SUSPENDED
+    CANCELLED
+    ARCHIVED
+}
+
+enum MembershipStatus {
+    ACTIVE
+    SUSPENDED
+    REMOVED
+}
+
+enum InvitationStatus {
+    PENDING
+    ACCEPTED
+    REVOKED
+    EXPIRED
+}
+
+enum SystemRoleKey {
+    OWNER
+    ADMIN
+    TEACHER
+    ACCOUNTANT
+    COORDINATOR
+    READ_ONLY
+}
+
+enum CustomFieldEntity {
+    STUDENT
+    GUARDIAN
+}
+
+enum CustomFieldType {
+    TEXT
+    NUMBER
+    DATE
+    BOOLEAN
+    SELECT
+}
+
+// ---- people ----
+enum Gender {
+    MALE
+    FEMALE
+    OTHER
+}
+
+// Stable internal statuses. Display names are renamed via TerminologyLabel.
+enum StudentStatus {
+    ACTIVE
+    INACTIVE
+    COMPLETED
+    SUSPENDED
+    DROPPED
+}
+
+enum GuardianRelationship {
+    FATHER
+    MOTHER
+    BROTHER
+    SISTER
+    UNCLE
+    AUNT
+    GRANDPARENT
+    LEGAL_GUARDIAN
+    OTHER
+}
+
+enum NoteVisibility {
+    STAFF_ONLY
+    GUARDIAN_VISIBLE
+}
+
+enum DocumentType {
+    ADMISSION_FORM
+    CERTIFICATE
+    ID_DOCUMENT
+    OTHER
+}
+
+// ---- academics ----
+enum RecordStatus {
+    ACTIVE
+    ARCHIVED
+}
+
+enum AcademicYearStatus {
+    PLANNED
+    ACTIVE
+    CLOSED
+}
+
+enum ClassGroupStatus {
+    ACTIVE
+    COMPLETED
+    ARCHIVED
+}
+
+enum EnrollmentStatus {
+    ACTIVE
+    COMPLETED
+    PROMOTED
+    TRANSFERRED
+    DROPPED
+}
+
+enum SubjectEnrollmentStatus {
+    ACTIVE
+    COMPLETED
+    DROPPED
+}
+
+// ---- teaching operations ----
+enum SessionStatus {
+    SCHEDULED
+    COMPLETED
+    CANCELLED
+    RESCHEDULED
+}
+
+enum AttendanceMode {
+    DAILY
+    PERIOD
+    SUBJECT
+    SESSION
+}
+
+enum AttendanceStatus {
+    PRESENT
+    ABSENT
+    LATE
+    EXCUSED
+    LEAVE
+}
+
+enum SyllabusNodeType {
+    CHAPTER
+    TOPIC
+    LESSON
+    TASK
+}
+
+enum ProgressStatus {
+    PLANNED
+    STARTED
+    COMPLETED
+    REVISED
+    ASSESSED
+}
+
+enum HomeworkStatus {
+    ASSIGNED
+    SUBMITTED
+    LATE
+    REVIEWED
+    INCOMPLETE
+    EXCUSED
+}
+
+// ---- assessment ----
+enum MarkStatus {
+    ENTERED
+    ABSENT
+    EXEMPT
+    WITHHELD
+    NOT_ENROLLED
+}
+
+enum ResultWorkflowStatus {
+    DRAFT
+    REVIEWED
+    APPROVED
+    PUBLISHED
+}
+
+enum ResultOutcome {
+    PASS
+    FAIL
+    WITHHELD
+    INCOMPLETE
+}
+
+enum PositionScope {
+    CLASS_GROUP
+    SECTION
+}
+
+// ---- student finance ----
+enum FeeRecurrence {
+    ONE_TIME
+    MONTHLY
+    TERM
+    YEARLY
+}
+
+enum InvoiceStatus {
+    DRAFT
+    ISSUED
+    PARTIAL
+    PAID
+    OVERDUE // normally derived from dueDate; stored value set by a daily job
+    REFUNDED
+    WAIVED
+    CANCELLED
+}
+
+enum PaymentMethod {
+    CASH
+    BANK_TRANSFER
+    BKASH
+    NAGAD
+    ROCKET
+    OTHER
+}
+
+enum PaymentStatus {
+    COMPLETED
+    REVERSED
+}
+
+enum AdjustmentType {
+    DISCOUNT
+    WAIVER
+    SCHOLARSHIP
+    FINE
+    CREDIT
+    OPENING_BALANCE
+    PAYMENT_REVERSAL
+    REFUND
+    WRITE_OFF
+}
+
+// ---- communication / reports / jobs ----
+enum CommunicationChannel {
+    IN_APP
+    EMAIL
+    SMS
+    WHATSAPP_LINK
+}
+
+enum NoticeStatus {
+    DRAFT
+    PUBLISHED
+    ARCHIVED
+}
+
+enum NoticeTargetType {
+    ALL_STAFF
+    ROLE
+    CLASS_GROUP
+    MEMBERSHIP
+}
+
+enum DeliveryStatus {
+    QUEUED
+    SENT
+    DELIVERED
+    FAILED
+    CANCELLED
+}
+
+enum ShareReportType {
+    STUDENT_RESULT
+    STUDENT_PROGRESS
+    ATTENDANCE_SUMMARY
+    RECEIPT
+    INVOICE
+    CLASS_RESULT_SUMMARY
+}
+
+enum JobStatus {
+    QUEUED
+    PROCESSING
+    COMPLETED
+    FAILED
+    CANCELLED
+    EXPIRED
+}
+
+enum ImportType {
+    STUDENTS
+    GUARDIANS
+    MARKS
+}
+
+enum ExportFormat {
+    PDF
+    CSV
+    XLSX
+}
+
+enum NumberSequenceKey {
+    STUDENT_CODE
+    INVOICE
+    RECEIPT
+    SUBSCRIPTION_INVOICE
+}
+
+// ---- SaaS billing ----
+enum BillingInterval {
+    MONTHLY
+    YEARLY
+}
+
+enum SubscriptionStatus {
+    TRIALING
+    ACTIVE
+    PAST_DUE
+    GRACE_PERIOD
+    SUSPENDED
+    CANCELLED
+    EXPIRED
+}
+
+enum SubscriptionInvoiceStatus {
+    OPEN
+    PAID
+    FAILED
+    EXPIRED
+    CANCELLED
+    REFUNDED
+}
+
+enum GatewayPaymentStatus {
+    INITIATED
+    PENDING
+    SUCCEEDED
+    FAILED
+    CANCELLED
+    EXPIRED
+}
+
+enum WebhookStatus {
+    RECEIVED
+    PROCESSED
+    FAILED
+    IGNORED
 }

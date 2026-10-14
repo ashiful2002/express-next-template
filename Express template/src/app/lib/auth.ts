@@ -6,12 +6,11 @@ import { bearer, emailOTP } from "better-auth/plugins";
 import { sendEmail } from "../utils/email";
 import { envVars } from "../config/env";
 
-
 //   new cmmasd
 export const auth = betterAuth({
   baseURL: envVars.BETTER_AUTH_URL,
-  basePath: "/api/auth",
   secret: envVars.BETTER_AUTH_SECRET,
+  // basePath: "/api/auth",
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
@@ -21,8 +20,8 @@ export const auth = betterAuth({
   },
   socialProviders: {
     google: {
-      clientId: envVars.GOOGLE_CLIENT_ID,
-      clientSecret: envVars.GOOGLE_CLIENT_SECRET,
+      clientId: envVars.GOOGLE_CLIENT_ID || "",
+      clientSecret: envVars.GOOGLE_CLIENT_SECRET || "",
       // callbackURL: envVars.GOOGLE_CALLBACK_URL,
 
       mapProfileToUser: () => {
@@ -32,9 +31,9 @@ export const auth = betterAuth({
           needPasswordChange: false,
           isDeleted: false,
           deletedAt: null,
-        }
+        };
       },
-    }
+    },
   },
   emailVerification: {
     sendOnSignUp: true,
@@ -116,15 +115,13 @@ export const auth = betterAuth({
     },
   },
   redirectUrls: {
-    signIn: `${envVars.BETTER_AUTH_URL}/api/auth/google/success`
+    signIn: `${envVars.BETTER_AUTH_URL}/api/v1/auth/google/success`,
   },
   trustedOrigins: [
-    process.env.BETTER_AUTH_URL || "http://localhost:5000",
-    "http://localhost:5000",
-    "http://localhost:5001",
-    "http://localhost:3000",
+    process.env.BETTER_AUTH_URL ||
+      "http://localhost:5000" ||
+      "http://localhost:3000",
   ],
-
 
   advanced: {
     // disableCSRFCheck: true,
@@ -136,7 +133,7 @@ export const auth = betterAuth({
           secure: true,
           httpOnly: true,
           path: "/",
-        }
+        },
       },
       sessionToken: {
         attributes: {
@@ -144,8 +141,8 @@ export const auth = betterAuth({
           secure: true,
           httpOnly: true,
           path: "/",
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 });
