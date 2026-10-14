@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from "@/src/components/ui/card"
 import { verifyEmailAction } from "../../_action/auth.action"
+import { toast } from "@/src/components/common/app-toast"
 
 function VerifyEmailForm() {
   const router = useRouter()
@@ -26,23 +27,22 @@ function VerifyEmailForm() {
 
   const [email, setEmail] = useState(searchParams.get("email") || "")
   const [otp, setOtp] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [hasError, setHasError] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!email) {
-      setError("Please provide your email address.")
+      toast.error("Please provide your email address.")
       return
     }
     if (otp.length < 6) {
-      setError("Please enter all 6 digits of your verification code.")
+      setHasError(true)
+      toast.error("Please enter all 6 digits of your verification code.")
       return
     }
 
-    setError(null)
-    setSuccess(null)
+    setHasError(false)
     setIsSubmitting(true)
 
     try {
@@ -50,15 +50,18 @@ function VerifyEmailForm() {
       if (!res.success) {
         throw new Error(res.message || "Verification failed.")
       }
-      setSuccess("Email verified successfully! Redirecting to your profile...")
+      toast.success("Email verified successfully!", {
+        description: "Redirecting to your profile...",
+      })
       setTimeout(() => {
         router.push("/dashboard/profile")
-      }, 1500)
+      }, 1200)
     } catch (err: unknown) {
+      setHasError(true)
       if (err instanceof Error) {
-        setError(err.message)
+        toast.error(err.message)
       } else {
-        setError("Verification failed. Please check your OTP code.")
+        toast.error("Verification failed. Please check your OTP code.")
       }
     } finally {
       setIsSubmitting(false)
@@ -79,18 +82,6 @@ function VerifyEmailForm() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {error && (
-            <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/15 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 rounded-md border border-emerald-500/20 bg-emerald-500/15 p-3 text-sm text-emerald-600 dark:text-emerald-400">
-              {success}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">Account Email</Label>
@@ -113,9 +104,9 @@ function VerifyEmailForm() {
                 value={otp}
                 onChange={(val) => {
                   setOtp(val)
-                  if (error) setError(null)
+                  if (hasError) setHasError(false)
                 }}
-                error={Boolean(error)}
+                error={hasError}
                 disabled={isSubmitting}
                 autoFocus
               />

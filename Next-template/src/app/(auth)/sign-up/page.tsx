@@ -166,7 +166,7 @@ export default function RegisterPage() {
           <CardFooter className="flex justify-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
-              href="/login"
+              href="/sign-in"
               className="ml-1 font-medium text-primary hover:underline"
             >
               Sign in

@@ -47,7 +47,7 @@ export function HeroSection({ isAuthenticated = false }: HeroSectionProps) {
                   <HugeiconsIcon icon={ArrowRight01Icon} className="size-4" />
                 </AppButton>
               </Link>
-              <Link href="/login">
+              <Link href="/sign-in">
                 <AppButton variant="outline" size="lg">
                   Sign In
                 </AppButton>

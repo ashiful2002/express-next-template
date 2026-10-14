@@ -78,7 +78,7 @@ export const authService = {
       process.env.NEXT_PUBLIC_BACKEND_URL ||
       process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, "") ||
       "http://localhost:5001"
-    return `${backendUrl}/api/v1/auth/login/google?redirectPath=${encodeURIComponent(
+    return `${backendUrl}/api/v1/auth/sign-in/google?redirectPath=${encodeURIComponent(
       redirectPath
     )}`
   },

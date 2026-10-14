@@ -18,7 +18,16 @@ function decodeJwt<T = Record<string, unknown>>(token: string): T | null {
   }
 }
 
-const ALLOWED_ROLES = [ "ADMIN", "SUPER_ADMIN",]
+const ALLOWED_ROLES = [
+  "CUSTOMER",
+  "USER",
+  "TRADER",
+  "ADMIN",
+  "SUPER_ADMIN",
+  "PLATFORM_ADMIN",
+  "OWNER",
+  "EMPLOYEE",
+]
 
 export default async function proxy(request: NextRequest) {
   const token =
@@ -58,8 +67,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/dashboard",
-    "/dashboard/:path*",
-  ],
+  matcher: ["/dashboard", "/dashboard/:path*"],
 }

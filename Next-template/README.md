@@ -12,7 +12,7 @@ A production-ready Next.js 16 (App Router) starter powered by React 19, Tailwind
 - **Static Assets Ready**: Correctly located in root `/public` directory.
 - **Global Auth Context**: Real-time authentication state management via `useAuth()` hook.
 - **Pre-configured API Client**: Typed `fetch` wrapper in `src/lib/api-client.ts` with automatic cookie credentials for HTTP-only authentication tokens (`accessToken`, `better-auth.session_token`).
-- **Starter Auth Pages**: Ready-to-use `/login` and `/register` pages with form validation and Google OAuth redirection.
+- **Starter Auth Pages**: Ready-to-use `/sign-in` and `/register` pages with form validation and Google OAuth redirection.
 
 ---
 

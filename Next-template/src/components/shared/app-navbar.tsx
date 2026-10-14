@@ -124,10 +124,7 @@ export function AppNavbar({
           ) : isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <span className="hidden text-xs text-muted-foreground sm:inline-block">
-                Signed in as{" "}
-                <strong className="text-foreground">
-                  {user.name || user.email}
-                </strong>
+                <Link href={"/dashboard"}>Dashboard</Link>
               </span>
               <UserMenu
                 user={{

@@ -59,7 +59,7 @@ function ResetPasswordForm() {
       await resetPasswordAction({ email, otp, newPassword })
       setSuccess("Password reset successfully! Redirecting to login...")
       setTimeout(() => {
-        router.push(`/login?email=${encodeURIComponent(email)}`)
+        router.push(`/sign-in?email=${encodeURIComponent(email)}`)
       }, 1500)
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -165,7 +165,7 @@ function ResetPasswordForm() {
         <CardFooter className="flex justify-center text-sm text-muted-foreground">
           Back to{" "}
           <Link
-            href="/login"
+            href="/sign-in"
             className="ml-1 font-medium text-primary hover:underline"
           >
             Sign in

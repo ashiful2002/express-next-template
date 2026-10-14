@@ -85,7 +85,7 @@ export function AuthStatusCard({
             No active user session found. Try creating a new account or signing in using your backend auth endpoints.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/login">
+            <Link href="/sign-in">
               <AppButton variant="default">Sign In to Account</AppButton>
             </Link>
             <Link href="/sign-up">

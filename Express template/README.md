@@ -55,7 +55,7 @@ src/
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/auth/sign-up` | Register a new user | No |
-| `POST` | `/auth/login` | Authenticate user & issue tokens | No |
+| `POST` | `/auth/sign-in` | Authenticate user & issue tokens | No |
 | `GET` | `/auth/me` | Fetch authenticated user data | Yes (Any role) |
 | `POST` | `/auth/refresh-token` | Issue new access token | No (Cookie-based) |
 | `POST` | `/auth/change-password` | Update account password | Yes (Any role) |
@@ -63,7 +63,7 @@ src/
 | `POST` | `/auth/verify-email` | Verify email with OTP | No |
 | `POST` | `/auth/forgot-password` | Request password reset OTP | No |
 | `POST` | `/auth/reset-password` | Reset password using OTP | No |
-| `GET` | `/auth/login/google` | Google OAuth sign-in | No |
+| `GET` | `/auth/sign-in/google` | Google OAuth sign-in | No |
 | `GET` | `/auth/google/success` | OAuth success redirect handler | No |
 | `GET` | `/auth/google/error` | OAuth failure redirect handler | No |
 
